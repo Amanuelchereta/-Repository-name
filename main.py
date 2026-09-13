@@ -3,6 +3,8 @@ import logging
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 
 import psycopg
 from psycopg.rows import dict_row
@@ -29,6 +31,23 @@ MAX_BID_CENTS = 999999
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("amanchereta")
+
+
+# --- Render Health Check HTTP Server (ለ Render Port 10000 ምላሽ እንዲሰጥ) ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive and running!")
+
+    def log_message(self, format, *args):
+        pass  # ሎግ እንዳይበዛ ዝም ያሰኘዋል
+
+
+def run_health_server():
+    server = HTTPServer(("0.0.0.0", PORT), HealthCheckHandler)
+    log.info("Health check server running on port %d", PORT)
+    server.serve_forever()
 
 
 def db():
@@ -516,12 +535,13 @@ async def cb(update, context):
         return await q.message.reply_text(msg or "ምንም መረጃ የለም።", parse_mode="HTML")
 
 
-async def health(update, context):
-    return
-
-
 def main():
     init_db()
+
+    # Health Check ሰርቨርን በ Background Thread ማስጀመር
+    server_thread = threading.Thread(target=run_health_server, daemon=True)
+    server_thread.start()
+
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -540,7 +560,7 @@ def main():
 
     app.run_webhook(
         listen="0.0.0.0",
-        port=PORT,
+        port=int(os.getenv("PORT", "10000")),
         url_path=WEBHOOK_SECRET,
         webhook_url=webhook_url,
         secret_token=WEBHOOK_SECRET,
