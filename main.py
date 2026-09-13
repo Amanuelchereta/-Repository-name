@@ -23,7 +23,8 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "8245481401"))
 DATABASE_URL = os.environ["DATABASE_URL"]
 PORT = int(os.getenv("PORT", "10000"))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "aman-auction-webhook-2026")
+WEBHOOK_SECRET = "amanauction2026"
+
 DAYS = 15
 BID_PRICE_CENTS = 5000
 MIN_BID_CENTS = 100
