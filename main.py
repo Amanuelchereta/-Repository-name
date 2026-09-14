@@ -1,7 +1,9 @@
 import os
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import psycopg
 from psycopg.rows import dict_row
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
@@ -32,6 +34,22 @@ DAYS = 15
 BID_PRICE_CENTS = 5000
 MIN_BID_CENTS = 100
 MAX_BID_CENTS = 999999
+
+# ለሬንደር ጤና ማረጋገጫ (Health Check) ትንሽ HTTP ሰርቨር በጀርባ ማሰራት
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+    def log_message(self, format, *args):
+        pass
+
+def run_health_check():
+    try:
+        server = HTTPServer(('0.0.0.0', PORT), SimpleHandler)
+        server.serve_forever()
+    except Exception as e:
+        log.info(f"Health check server note: {e}")
 
 # ዳታቤዝ እና የሰዓት ማስተካከያ
 def db():
@@ -349,6 +367,9 @@ def main():
 
     init_db()
 
+    # የጤና ማረጋገጫ ሰርቨርን በጀርባ (Background) ማስጀመር
+    threading.Thread(target=run_health_check, daemon=True).start()
+
     # የቴሌግራም አፕሊኬሽን መገንባት
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -367,7 +388,6 @@ def main():
     webhook_url = f"{RENDER_EXTERNAL_URL}/{WEBHOOK_SECRET}"
     log.info("Starting webhook: %s", webhook_url)
 
-    # ዌብሁክን በፖርት 10000 ብቻ ማስተናገድ (Address already in use ስህተትን ያስወግዳል)
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
